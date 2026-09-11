@@ -1,6 +1,8 @@
 /**
- * Storage — localStorage wrapper for persistent data
- * Stores dhikr counts and visitor du'as per-device.
+ * Storage — API + localStorage hybrid
+ * 
+ * Uses Vercel KV via API routes for shared state (all visitors see same data).
+ * Falls back to localStorage if API is unavailable (offline/local dev).
  */
 
 const STORAGE_KEYS = {
@@ -9,11 +11,36 @@ const STORAGE_KEYS = {
   STATS: 'prayForHanaa_stats',
 };
 
+// === API Helpers ===
+
 /**
- * Safely get a value from localStorage.
- * Returns fallback if key doesn't exist or JSON is invalid.
+ * Generic GET request to API
  */
-export function getStorage(key, fallback = null) {
+export async function apiGet(endpoint) {
+  const res = await fetch(endpoint);
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}
+
+/**
+ * Generic POST request to API
+ */
+export async function apiPost(endpoint, data) {
+  const res = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `API error: ${res.status}`);
+  }
+  return res.json();
+}
+
+// === Local Storage Helpers (fallback / cache) ===
+
+export function getLocal(key, fallback = null) {
   try {
     const raw = localStorage.getItem(key);
     if (raw === null) return fallback;
@@ -23,72 +50,88 @@ export function getStorage(key, fallback = null) {
   }
 }
 
-/**
- * Safely set a value in localStorage.
- */
-export function setStorage(key, value) {
+export function setLocal(key, value) {
   try {
     localStorage.setItem(key, JSON.stringify(value));
   } catch {
-    // Storage full or unavailable — silently fail
+    // Storage full or unavailable
   }
 }
 
-// === Dhikr Helpers ===
+// === Dhikr API Functions ===
 
-const DEFAULT_DHIKR = {
-  subhanallah: 0,
-  alhamdulillah: 0,
-  astaghfirullah: 0,
-  lahawla: 0,
-};
-
-export function getDhikrCounts() {
-  return getStorage(STORAGE_KEYS.DHIKR, { ...DEFAULT_DHIKR });
+/**
+ * Fetch shared dhikr counts from API (all visitors' combined total)
+ */
+export async function fetchDhikrCounts() {
+  try {
+    const counts = await apiGet('/api/dhikr');
+    setLocal(STORAGE_KEYS.DHIKR, counts); // cache locally
+    return counts;
+  } catch {
+    // Fallback to cached local data
+    return getLocal(STORAGE_KEYS.DHIKR, {
+      subhanallah: 0,
+      alhamdulillah: 0,
+      astaghfirullah: 0,
+      lahawla: 0,
+    });
+  }
 }
 
-export function incrementDhikr(key) {
-  const counts = getDhikrCounts();
-  counts[key] = (counts[key] || 0) + 1;
-  setStorage(STORAGE_KEYS.DHIKR, counts);
-  return counts;
+/**
+ * Increment a dhikr counter on the server (shared across all visitors)
+ */
+export async function incrementDhikrAPI(key) {
+  try {
+    const counts = await apiPost('/api/dhikr', { key });
+    setLocal(STORAGE_KEYS.DHIKR, counts); // cache locally
+    return counts;
+  } catch {
+    // Offline fallback: increment locally
+    const counts = getLocal(STORAGE_KEYS.DHIKR, {
+      subhanallah: 0, alhamdulillah: 0, astaghfirullah: 0, lahawla: 0,
+    });
+    counts[key] = (counts[key] || 0) + 1;
+    setLocal(STORAGE_KEYS.DHIKR, counts);
+    return counts;
+  }
 }
 
-export function getDhikrTotal() {
-  const counts = getDhikrCounts();
-  return Object.values(counts).reduce((sum, n) => sum + n, 0);
+/**
+ * Get total dhikr count from a counts object
+ */
+export function getDhikrTotal(counts) {
+  if (!counts) return 0;
+  return Object.values(counts).reduce((sum, n) => sum + (n || 0), 0);
 }
 
-// === Visitor Du'as Helpers ===
+// === Visitor Du'as API Functions ===
 
-export function getVisitorDuas() {
-  return getStorage(STORAGE_KEYS.VISITOR_DUAS, []);
+/**
+ * Fetch all shared visitor du'as from API
+ */
+export async function fetchVisitorDuas() {
+  try {
+    const duas = await apiGet('/api/visitor-duas');
+    setLocal(STORAGE_KEYS.VISITOR_DUAS, duas); // cache locally
+    return duas;
+  } catch {
+    return getLocal(STORAGE_KEYS.VISITOR_DUAS, []);
+  }
 }
 
-export function addVisitorDua(name, message) {
-  const duas = getVisitorDuas();
-  const entry = {
-    id: generateId(),
-    name,
-    message,
-    createdAt: new Date().toISOString(),
-  };
-  duas.unshift(entry); // newest first
-  setStorage(STORAGE_KEYS.VISITOR_DUAS, duas);
-  return entry;
-}
-
-// === Stats Helpers ===
-
-export function getStats() {
-  return getStorage(STORAGE_KEYS.STATS, { duasRead: 0 });
-}
-
-export function incrementDuasStat() {
-  const stats = getStats();
-  stats.duasRead = (stats.duasRead || 0) + 1;
-  setStorage(STORAGE_KEYS.STATS, stats);
-  return stats;
+/**
+ * Submit a new visitor du'a to the server (visible to all visitors)
+ */
+export async function submitVisitorDua(name, message) {
+  // Try API first
+  const dua = await apiPost('/api/visitor-duas', { name, message });
+  // Update local cache
+  const cached = getLocal(STORAGE_KEYS.VISITOR_DUAS, []);
+  cached.unshift(dua);
+  setLocal(STORAGE_KEYS.VISITOR_DUAS, cached);
+  return dua;
 }
 
 // === Arabic Numeral Formatting ===
@@ -97,12 +140,6 @@ const ARABIC_DIGITS = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩
 
 export function toArabicNumerals(num) {
   return String(num).replace(/\d/g, (d) => ARABIC_DIGITS[d]);
-}
-
-// === Utilities ===
-
-function generateId() {
-  return Math.random().toString(36).substring(2, 14);
 }
 
 export { STORAGE_KEYS };

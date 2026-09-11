@@ -1,24 +1,31 @@
 /**
- * Visitor Du'as — form submission, localStorage storage, card rendering
+ * Visitor Du'as — shared across all visitors via API
+ * Every visitor sees everyone's du'as.
  */
 
-import { getVisitorDuas, addVisitorDua, toArabicNumerals } from '../utils/storage.js';
+import { fetchVisitorDuas, submitVisitorDua, toArabicNumerals } from '../utils/storage.js';
 import { escapeHtml, sanitizeInput, isRateLimited } from '../utils/sanitize.js';
 
-export function initVisitorDuas() {
-  renderVisitorList();
+let allDuas = [];
+
+export async function initVisitorDuas() {
   initVisitorForm();
+
+  // Fetch all shared du'as from API and render
+  allDuas = await fetchVisitorDuas();
+  renderVisitorList(allDuas);
+  updateDuasStat(allDuas);
 }
 
 function initVisitorForm() {
   const form = document.getElementById('visitor-form');
   if (!form) return;
 
-  form.addEventListener('submit', (e) => {
+  form.addEventListener('submit', async (e) => {
     e.preventDefault();
     hideMessages();
 
-    // Rate limit check
+    // Rate limit check (client-side)
     if (isRateLimited('visitor-dua', 10000)) {
       showError('يرجى الانتظار قليلاً قبل إضافة دعاء آخر');
       return;
@@ -26,6 +33,7 @@ function initVisitorForm() {
 
     const nameInput = document.getElementById('visitor-name');
     const messageInput = document.getElementById('visitor-message');
+    const submitBtn = document.getElementById('visitor-submit');
 
     const name = sanitizeInput(nameInput.value, 100);
     const message = sanitizeInput(messageInput.value, 500);
@@ -43,31 +51,41 @@ function initVisitorForm() {
       return;
     }
 
-    // Save to localStorage
-    addVisitorDua(name, message);
+    // Disable button while submitting
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'جاري الإرسال...';
+    }
 
-    // Re-render list
-    renderVisitorList();
+    try {
+      // Submit to API (saved to shared KV store)
+      const newDua = await submitVisitorDua(name, message);
 
-    // Update personal stats
-    updateDuasStat();
+      // Add to local list and re-render
+      allDuas.unshift(newDua);
+      renderVisitorList(allDuas);
+      updateDuasStat(allDuas);
 
-    // Clear form and show success
-    form.reset();
-    showSuccess('جزاك الله خيرًا — تمت إضافة دعائك');
-
-    // Auto-hide success after 4 seconds
-    setTimeout(hideMessages, 4000);
+      // Clear form and show success
+      form.reset();
+      showSuccess('جزاك الله خيرًا — تمت إضافة دعائك');
+      setTimeout(hideMessages, 4000);
+    } catch (err) {
+      showError(err.message || 'حدث خطأ — يرجى المحاولة مرة أخرى');
+    } finally {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'أضف دعاءك';
+      }
+    }
   });
 }
 
-function renderVisitorList() {
+function renderVisitorList(duas) {
   const listContainer = document.getElementById('visitor-list');
   if (!listContainer) return;
 
-  const duas = getVisitorDuas();
-
-  if (duas.length === 0) {
+  if (!duas || duas.length === 0) {
     listContainer.innerHTML = `
       <div class="empty-state">
         <p>لم يُضَف أي دعاء بعد</p>
@@ -102,19 +120,13 @@ function formatDate(isoString) {
 // === Form feedback helpers ===
 
 function showError(message) {
-  const errorEl = document.getElementById('visitor-error');
-  if (errorEl) {
-    errorEl.textContent = message;
-    errorEl.style.display = 'block';
-  }
+  const el = document.getElementById('visitor-error');
+  if (el) { el.textContent = message; el.style.display = 'block'; }
 }
 
 function showSuccess(message) {
-  const successEl = document.getElementById('visitor-success');
-  if (successEl) {
-    successEl.textContent = message;
-    successEl.style.display = 'block';
-  }
+  const el = document.getElementById('visitor-success');
+  if (el) { el.textContent = message; el.style.display = 'block'; }
 }
 
 function hideMessages() {
@@ -124,10 +136,9 @@ function hideMessages() {
   if (successEl) successEl.style.display = 'none';
 }
 
-function updateDuasStat() {
+function updateDuasStat(duas) {
   const statEl = document.getElementById('stat-duas');
   if (statEl) {
-    const duas = getVisitorDuas();
     statEl.textContent = toArabicNumerals(duas.length);
   }
 }

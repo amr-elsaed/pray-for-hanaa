@@ -9,22 +9,20 @@ import { initDhikr } from './components/dhikr.js';
 import { initVisitorDuas } from './components/visitor-duas.js';
 import { initLightbox } from './components/lightbox.js';
 import { initShare } from './components/share.js';
-import { getDhikrTotal, getVisitorDuas, toArabicNumerals } from './utils/storage.js';
 
 document.addEventListener('DOMContentLoaded', () => {
-  // Initialize all components
+  // Initialize synchronous components immediately
   initNavigation();
   initDuaSection();
-  initDhikr();
-  initVisitorDuas();
   initLightbox();
   initShare();
 
+  // Initialize async components (fetch shared data from API)
+  initDhikr();
+  initVisitorDuas();
+
   // Scroll reveal animations
   initScrollReveal();
-
-  // Load personal stats
-  loadPersonalStats();
 });
 
 /**
@@ -57,20 +55,4 @@ function initScrollReveal() {
   );
 
   revealElements.forEach((el) => observer.observe(el));
-}
-
-/**
- * Load personal stats from localStorage
- */
-function loadPersonalStats() {
-  const statDhikr = document.getElementById('stat-dhikr');
-  const statDuas = document.getElementById('stat-duas');
-
-  if (statDhikr) {
-    statDhikr.textContent = toArabicNumerals(getDhikrTotal());
-  }
-
-  if (statDuas) {
-    statDuas.textContent = toArabicNumerals(getVisitorDuas().length);
-  }
 }
