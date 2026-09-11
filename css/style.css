@@ -477,119 +477,46 @@ a {
    DU'A SECTION
    ============================================================ */
 
-/* Category tabs — horizontal scroll on mobile */
-.dua-tabs {
-  display: flex;
-  gap: var(--space-sm);
-  overflow-x: auto;
-  padding-bottom: var(--space-sm);
-  margin-bottom: var(--space-xl);
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
+/* Simple du'a list */
+.dua-list {
+  max-width: 700px;
+  margin: var(--space-xl) auto 0;
 }
 
-.dua-tabs::-webkit-scrollbar {
-  display: none;
+.dua-item {
+  padding: var(--space-lg) 0;
+  border-bottom: 1px solid var(--color-border-light);
 }
 
-.dua-tab {
-  flex-shrink: 0;
-  padding: var(--space-sm) var(--space-lg);
-  border-radius: 100px;
-  font-size: var(--text-sm);
-  font-weight: 500;
-  color: var(--color-text-secondary);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  transition: all var(--transition-fast);
-  min-height: 44px;
-  white-space: nowrap;
+.dua-item:last-child {
+  border-bottom: none;
 }
 
-.dua-tab.is-active {
-  background: var(--color-accent-green);
-  color: white;
-  border-color: var(--color-accent-green);
-}
-
-/* Du'a cards grid */
-.dua-grid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: var(--space-lg);
-}
-
-.dua-card {
-  position: relative;
-  background: var(--color-surface);
-  border-radius: var(--border-radius);
-  padding: var(--space-lg);
-  border: 1px solid var(--color-border-light);
-  box-shadow: var(--shadow-sm);
-  transition: box-shadow var(--transition-base);
-}
-
-.dua-card:hover {
-  box-shadow: var(--shadow-md);
-}
-
-.dua-card--quranic {
+.dua-item--quranic {
+  padding-right: var(--space-md);
   border-right: 3px solid var(--color-accent-gold);
-  background: linear-gradient(135deg, var(--color-surface) 0%, var(--color-accent-gold-light) 100%);
 }
 
-.dua-card__quran-badge {
-  display: inline-block;
-  font-size: var(--text-xs);
-  color: var(--color-accent-gold);
-  background: rgba(184, 146, 74, 0.1);
-  padding: 2px 10px;
-  border-radius: 100px;
-  margin-bottom: var(--space-sm);
-  font-weight: 500;
-}
-
-.dua-card__text {
+.dua-item__text {
   font-family: var(--font-heading);
   font-size: var(--text-lg);
   line-height: 2.2;
   color: var(--color-text);
-  margin-bottom: var(--space-md);
   word-wrap: break-word;
   overflow-wrap: break-word;
 }
 
-.dua-card--quranic .dua-card__text {
+.dua-item--quranic .dua-item__text {
   font-family: var(--font-quranic);
   font-size: var(--text-xl);
-  color: var(--color-text);
 }
 
-.dua-card__source {
+.dua-item__source {
   display: block;
   font-size: var(--text-sm);
   color: var(--color-text-muted);
   font-style: normal;
-  margin-bottom: var(--space-sm);
-}
-
-.dua-card__copy {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-xs);
-  padding: var(--space-sm) var(--space-md);
-  border-radius: var(--border-radius-sm);
-  font-size: var(--text-sm);
-  color: var(--color-text-muted);
-  background: var(--color-bg);
-  border: 1px solid var(--color-border-light);
-  transition: all var(--transition-fast);
-  min-height: 36px;
-}
-
-.dua-card__copy:hover {
-  color: var(--color-accent-green);
-  border-color: var(--color-accent-green);
+  margin-top: var(--space-sm);
 }
 
 /* === Random Du'a === */
