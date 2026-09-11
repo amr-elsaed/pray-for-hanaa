@@ -2,6 +2,7 @@
   "name": "pray-for-hanaa",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "description": "صفحة تذكارية لروح هناء مصطفى السيد غزل رحمها الله",
   "dependencies": {
     "@upstash/redis": "^1.38.4"
